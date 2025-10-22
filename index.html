@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permainan Catur</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #papanCatur {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 2px solid #000;
+            width: 480px;
+            height: 480px;
+        }
+        .kotak {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .putih {
+            background-color: #f0d9b5;
+        }
+        .hitam {
+            background-color: #b58863;
+        }
+        .bidak {
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+        }
+        .terpilih {
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+        }
+        .gerakanMungkin {
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
+        }
+        #giliran {
+            margin-top: 20px;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div id="papanCatur"></div>
+        <div id="giliran">Giliran Putih</div>
+    </div>
+
+    <script>
+        const papan = document.getElementById('papanCatur');
+        const tampilanGiliran = document.getElementById('giliran');
+        let kotakTerpilih = null;
+        let pemainSekarang = 'putih'; // 'putih' atau 'hitam'
+        let papanAwal = [
+            ['benteng_hitam', 'kuda_hitam', 'menteri_hitam', 'ratu_hitam', 'raja_hitam', 'menteri_hitam', 'kuda_hitam', 'benteng_hitam'],
+            ['pion_hitam', 'pion_hitam', 'pion_hitam', 'pion_hitam', 'pion_hitam', 'pion_hitam', 'pion_hitam', 'pion_hitam'],
+            [null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null],
+            ['pion_putih', 'pion_putih', 'pion_putih', 'pion_putih', 'pion_putih', 'pion_putih', 'pion_putih', 'pion_putih'],
+            ['benteng_putih', 'kuda_putih', 'menteri_putih', 'ratu_putih', 'raja_putih', 'menteri_putih', 'kuda_putih', 'benteng_putih']
+        ];
+
+        // Path gambar (diperbarui sesuai permintaan)
+        const gambarBidak = {
+            'pion_putih': 'pion.png',
+            'pion_hitam': 'pion (1).png',
+            'benteng_putih': 'benteng.png',
+            'benteng_hitam': 'benteng (1).png',
+            'kuda_putih': 'kuda.png',
+            'kuda_hitam': 'kuda (1).png',
+            'menteri_putih': 'menteri.png',
+            'menteri_hitam': 'menteri (1).png',
+            'ratu_putih': 'ratu.png',
+            'ratu_hitam': 'ratu (1).png',
+            'raja_putih': 'raja.png',
+            'raja_hitam': 'raja (1).png'
+        };
+
+        // Buat papan
+        function buatPapan() {
+            papan.innerHTML = '';
+            for (let baris = 0; baris < 8; baris++) {
+                for (let kolom = 0; kolom < 8; kolom++) {
+                    const kotak = document.createElement('div');
+                    kotak.classList.add('kotak');
+                    kotak.classList.add((baris + kolom) % 2 === 0 ? 'putih' : 'hitam');
+                    kotak.dataset.baris = baris;
+                    kotak.dataset.kolom = kolom;
+                    kotak.addEventListener('click', tanganiKlikKotak);
+                    
+                    const bidak = papanAwal[baris][kolom];
+                    if (bidak) {
+                        const img = document.createElement('img');
+                        img.src = gambarBidak[bidak];
+                        img.classList.add('bidak');
+                        img.dataset.bidak = bidak;
+                        kotak.appendChild(img);
+                    }
+                    
+                    papan.appendChild(kotak);
+                }
+            }
+        }
+
+        // Tangani klik kotak
+        function tanganiKlikKotak(event) {
+            const kotak = event.currentTarget;
+            const baris = parseInt(kotak.dataset.baris);
+            const kolom = parseInt(kotak.dataset.kolom);
+            const bidak = kotak.querySelector('.bidak');
+            
+            if (kotakTerpilih) {
+                // Jika kotak sudah dipilih, coba gerakkan
+                if (gerakanValid(kotakTerpilih, kotak)) {
+                    gerakkanBidak(kotakTerpilih, kotak);
+                    gantiGiliran();
+                }
+                hapusPilihan();
+            } else if (bidak && dapatkanWarnaBidak(bidak.dataset.bidak) === pemainSekarang) {
+                // Pilih bidak jika giliran pemain sekarang
+                pilihKotak(kotak);
+            }
+        }
+
+        // Pilih kotak
+        function pilihKotak(kotak) {
+            kotakTerpilih = kotak;
+            kotak.classList.add('terpilih');
+            sorotiGerakanMungkin(kotak);
+        }
+
+        // Hapus pilihan dan sorotan
+        function hapusPilihan() {
+            if (kotakTerpilih) {
+                kotakTerpilih.classList.remove('terpilih');
+                document.querySelectorAll('.gerakanMungkin').forEach(kotak => kotak.classList.remove('gerakanMungkin'));
+                kotakTerpilih = null;
+            }
+        }
+
+        // Soroti gerakan mungkin berdasarkan aturan catur asli
+        function sorotiGerakanMungkin(kotak) {
+            const baris = parseInt(kotak.dataset.baris);
+            const kolom = parseInt(kotak.dataset.kolom);
+            const bidak = kotak.querySelector('.bidak').dataset.bidak;
+            const jenisBidak = bidak.split('_')[0];
+            const warna = dapatkanWarnaBidak(bidak);
+            
+            let gerakanMungkin = [];
+            
+            switch (jenisBidak) {
+                case 'pion':
+                    gerakanMungkin = dapatkanGerakanPion(baris, kolom, warna);
+                    break;
+                case 'benteng':
+                    gerakanMungkin = dapatkanGerakanBenteng(baris, kolom);
+                    break;
+                case 'kuda':
+                    gerakanMungkin = dapatkanGerakanKuda(baris, kolom);
+                    break;
+                case 'menteri':
+                    gerakanMungkin = dapatkanGerakanMenteri(baris, kolom);
+                    break;
+                case 'ratu':
+                    gerakanMungkin = dapatkanGerakanRatu(baris, kolom);
+                    break;
+                case 'raja':
+                    gerakanMungkin = dapatkanGerakanRaja(baris, kolom);
+                    break;
+            }
+            
+            gerakanMungkin.forEach(([r, c]) => {
+                const kotakTarget = document.querySelector(`[data-baris="${r}"][data-kolom="${c}"]`);
+                if (kotakTarget) {
+                    kotakTarget.classList.add('gerakanMungkin');
+                }
+            });
+        }
+
+        // Fungsi gerakan untuk pion
+        function dapatkanGerakanPion(baris, kolom, warna) {
+            const gerakan = [];
+            const arah = warna === 'putih' ? -1 : 1;
+            const barisDepan = baris + arah;
+            
+            // Maju 1 langkah
+            if (barisDepan >= 0 && barisDepan < 8 && !papanAwal[barisDepan][kolom]) {
+                gerakan.push([barisDepan, kolom]);
+                // Maju 2 langkah dari posisi awal
+                const barisAwal = warna === 'putih' ? 6 : 1;
+                if (baris === barisAwal && !papanAwal[barisDepan + arah][kolom]) {
+                    gerakan.push([barisDepan + arah, kolom]);
+                }
+            }
+            
+            // Tangkap diagonal
+            for (let dc = -1; dc <= 1; dc += 2) {
+                const kolomBaru = kolom + dc;
+                if (kolomBaru >= 0 && kolomBaru < 8 && papanAwal[barisDepan][kolomBaru] && dapatkanWarnaBidak(papanAwal[barisDepan][kolomBaru]) !== warna) {
+                    gerakan.push([barisDepan, kolomBaru]);
+                }
+            }
+            
+            return gerakan;
+        }
+
+        // Fungsi gerakan untuk benteng (horizontal dan vertikal)
+        function dapatkanGerakanBenteng(baris, kolom) {
+            const gerakan = [];
+            const arah = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+            
+            arah.forEach(([dr, dc]) => {
+                for (let i = 1; i < 8; i++) {
+                    const r = baris + dr * i;
+                    const c = kolom + dc * i;
+                    if (r < 0 || r >= 8 || c < 0 || c >= 8) break;
+                    if (papanAwal[r][c]) {
+                        if (dapatkanWarnaBidak(papanAwal[r][c]) !== pemainSekarang) gerakan.push([r, c]);
+                        break;
+                    }
+                    gerakan.push([r, c]);
+                }
+            });
+            
+            return gerakan;
+        }
+
+        // Fungsi gerakan untuk kuda (gerakan L)
+        function dapatkanGerakanKuda(baris, kolom) {
+            const gerakan = [];
+            const kemungkinan = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
+            
+            kemungkinan.forEach(([dr, dc]) => {
+                const r = baris + dr;
+                const c = kolom + dc;
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && (!papanAwal[r][c] || dapatkanWarnaBidak(papanAwal[r][c]) !== pemainSekarang)) {
+                    gerakan.push([r, c]);
+                }
+            });
+            
+            return gerakan;
+        }
+
+        // Fungsi gerakan untuk menteri (diagonal)
+        function dapatkanGerakanMenteri(baris, kolom) {
+            const gerakan = [];
+            const arah = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+            
+            arah.forEach(([dr, dc]) => {
+                for (let i = 1; i < 8; i++) {
+                    const r = baris + dr * i;
+                    const c = kolom + dc * i;
+                    if (r < 0 || r >= 8 || c < 0 || c >= 8) break;
+                    if (papanAwal[r][c]) {
+                        if (dapatkanWarnaBidak(papanAwal[r][c]) !== pemainSekarang) gerakan.push([r, c]);
+                        break;
+                    }
+                    gerakan.push([r, c]);
+                }
+            });
+            
+            return gerakan;
+        }
+
+        // Fungsi gerakan untuk ratu (kombinasi benteng dan menteri)
+        function dapatkanGerakanRatu(baris, kolom) {
+            return [...dapatkanGerakanBenteng(baris, kolom), ...dapatkanGerakanMenteri(baris, kolom)];
+        }
+
+        // Fungsi gerakan untuk raja (1 langkah ke segala arah)
+        function dapatkanGerakanRaja(baris, kolom) {
+            const gerakan = [];
+            const arah = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+            
+            arah.forEach(([dr, dc]) => {
+                const r = baris + dr;
+                const c = kolom + dc;
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && (!papanAwal[r][c] || dapatkanWarnaBidak(papanAwal[r][c]) !== pemainSekarang)) {
+                    gerakan.push([r, c]);
+                }
+            });
+            
+            return gerakan;
+        }
+
+        // Periksa apakah gerakan valid (sederhana: hanya cek jika kotak target valid dari sorotan)
+        function gerakanValid(dariKotak, keKotak) {
+            const barisKe = parseInt(keKotak.dataset.baris);
+            const kolomKe = parseInt(keKotak.dataset.kolom);
+            return keKotak.classList.contains('gerakanMungkin');
+        }
+
+        // Gerakkan bidak dan update papanAwal
+        function gerakkanBidak(dariKotak, keKotak) {
+            const bidak = dariKotak.querySelector('.bidak');
+            const barisDari = parseInt(dariKotak.dataset.baris);
+            const kolomDari = parseInt(dariKotak.dataset.kolom);
+            const barisKe = parseInt(keKotak.dataset.baris);
+            const kolomKe = parseInt(keKotak.dataset.kolom);
+            
+            // Update array papanAwal
+            papanAwal[barisKe][kolomKe] = bidak.dataset.bidak;
+            papanAwal[barisDari][kolomDari] = null;
+            
+            // Pindahkan elemen DOM
+            keKotak.appendChild(bidak);
+            dariKotak.innerHTML = '';
+        }
+
+        // Dapatkan warna bidak
+        function dapatkanWarnaBidak(bidak) {
+            return bidak.includes('putih') ? 'putih' : 'hitam';
+        }
+
+        // Ganti giliran
+        function gantiGiliran() {
+            pemainSekarang = pemainSekarang === 'putih' ? 'hitam' : 'putih';
+            tampilanGiliran.textContent = `Giliran ${pemainSekarang.charAt(0).toUpperCase() + pemainSekarang.slice(1)}`;
+        }
+
+        // Inisialisasi
+        buatPapan();
+    </script>
+</body>
+</html>
